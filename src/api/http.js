@@ -38,6 +38,12 @@ async function refreshAccessToken() {
  * - sends cookies (httpOnly auth) with credentials: 'include'
  * - retries once on 401 by calling refresh-token (cookie-based)
  */
+
+
+// Why we do it this way
+// Centralizes API logic → don’t repeat fetch and token logic everywhere.
+// Handles auth refresh automatically → smooth user experience.
+// Provides consistent error handling.
 export async function apiFetch(path, { headers, retry401 = true, ...init } = {}) {
   const mergedHeaders = new Headers(headers ?? {});
 

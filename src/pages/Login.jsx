@@ -24,7 +24,16 @@ function Login() {
 
   async function onSubmit(e) {
     e.preventDefault();
-    await dispatch(loginThunk({ email, password }));
+    const res = await dispatch(loginThunk({ email, password }));
+    const role = res?.payload?.user?.role ?? res?.payload?.user?.userRole;
+    if (role === "doctor") {
+      navigate("/doctor/overview", { replace: true });
+      return;
+    }
+    if (role === "patient") {
+      navigate("/patient/dashboard", { replace: true });
+      return;
+    }
   }
 
   return (

@@ -31,7 +31,7 @@ function Login() {
       return;
     }
     if (role === "patient") {
-      navigate("/patient/dashboard", { replace: true });
+      navigate("/patient/overview", { replace: true });
       return;
     }
   }

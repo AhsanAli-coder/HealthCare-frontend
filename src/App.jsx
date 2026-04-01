@@ -11,6 +11,11 @@ import DoctorOverview from "./pages/doctor/DoctorOverview.jsx";
 import DoctorPlaceholder from "./pages/doctor/DoctorPlaceholder.jsx";
 import DoctorSettings from "./pages/doctor/DoctorSettings.jsx";
 import RequireDoctor from "./components/auth/RequireDoctor.jsx";
+import DoctorMessages from "./pages/doctor/DoctorMessages.jsx";
+import RequirePatient from "./components/auth/RequirePatient.jsx";
+import PatientDashboardLayout from "./components/patient/layout/PatientDashboardLayout.jsx";
+import PatientOverview from "./pages/patient/PatientOverview.jsx";
+import PatientPlaceholder from "./pages/patient/PatientPlaceholder.jsx";
 
 function App() {
   return (
@@ -37,10 +42,31 @@ function App() {
           />
           <Route
             path="messages"
-            element={<DoctorPlaceholder title="Message" />}
+            element={<DoctorMessages />}
           />
           <Route path="blog" element={<DoctorPlaceholder title="Blog" />} />
           <Route path="settings" element={<DoctorSettings />} />
+        </Route>
+      </Route>
+
+      {/* Patient area: no public Header/Footer */}
+      <Route path="patient" element={<RequirePatient />}>
+        <Route element={<PatientDashboardLayout />}>
+          <Route path="overview" element={<PatientOverview />} />
+          <Route
+            path="appointments"
+            element={<PatientPlaceholder title="Appointments" />}
+          />
+          <Route path="doctors" element={<PatientPlaceholder title="Doctors" />} />
+          <Route
+            path="messages"
+            element={<PatientPlaceholder title="Messages" />}
+          />
+          <Route path="reviews" element={<PatientPlaceholder title="Reviews" />} />
+          <Route
+            path="settings"
+            element={<PatientPlaceholder title="Settings" />}
+          />
         </Route>
       </Route>
 

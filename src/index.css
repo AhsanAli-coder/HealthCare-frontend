@@ -1,1 +1,28 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@500;600;700&display=swap");
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-hero: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-teal: #007e85;
+  --color-brand-teal-hover: #006970;
+  --color-brand-green: #3d8b4a;
+  --color-brand-green-hover: #327341;
+
+  --color-surface-muted: #f3f4f6;
+  --color-hero-bg: #f2f2f2;
+
+  /* Legacy tokens used in older classes — map to brand */
+  --color-login: #007e85;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}

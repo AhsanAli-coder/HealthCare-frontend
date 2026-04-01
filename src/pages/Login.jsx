@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/hooks.js";
-import { hydrateAuth, loginThunk } from "../store/slices/authSlice.js";
+import { loginThunk } from "../store/slices/authSlice.js";
 
 function getErrorText(err) {
   if (!err) return null;
@@ -13,18 +13,14 @@ function getErrorText(err) {
 function Login() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { status, error, accessToken } = useAppSelector((s) => s.auth);
+  const { status, error, isAuthenticated } = useAppSelector((s) => s.auth);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    dispatch(hydrateAuth());
-  }, [dispatch]);
-
-  useEffect(() => {
-    if (accessToken) navigate("/", { replace: true });
-  }, [accessToken, navigate]);
+    if (isAuthenticated) navigate("/", { replace: true });
+  }, [isAuthenticated, navigate]);
 
   async function onSubmit(e) {
     e.preventDefault();

@@ -7,4 +7,14 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      // Dev proxy to avoid CORS and allow httpOnly cookies.
+      "/api/v1": {
+        target: "http://localhost:9000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 })

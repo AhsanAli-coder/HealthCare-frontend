@@ -1,9 +1,5 @@
 import { API_BASE_URL } from "../config/env.js";
 
-function isObject(v) {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
-}
-
 export class ApiError extends Error {
   constructor(message, { status, data } = {}) {
     super(message);
@@ -11,23 +7,6 @@ export class ApiError extends Error {
     this.status = status;
     this.data = data;
   }
-}
-
-function getTokens() {
-  try {
-    const raw = localStorage.getItem("auth_tokens");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function setTokens(tokens) {
-  localStorage.setItem("auth_tokens", JSON.stringify(tokens));
-}
-
-export function clearTokens() {
-  localStorage.removeItem("auth_tokens");
 }
 
 async function parseJsonSafe(res) {
@@ -40,11 +19,12 @@ async function parseJsonSafe(res) {
   }
 }
 
-async function refreshAccessToken(refreshToken) {
+async function refreshAccessToken() {
   const res = await fetch(`${API_BASE_URL}/users/refresh-token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken }),
+    // Backend uses httpOnly cookies; send them along.
+    credentials: "include",
   });
   const data = await parseJsonSafe(res);
   if (!res.ok) {
@@ -55,45 +35,26 @@ async function refreshAccessToken(refreshToken) {
 
 /**
  * Minimal fetch wrapper:
- * - adds Authorization header if accessToken exists
- * - retries once on 401 by calling refresh-token
+ * - sends cookies (httpOnly auth) with credentials: 'include'
+ * - retries once on 401 by calling refresh-token (cookie-based)
  */
 export async function apiFetch(path, { headers, retry401 = true, ...init } = {}) {
-  const tokens = getTokens();
-  const accessToken = tokens?.accessToken;
-
   const mergedHeaders = new Headers(headers ?? {});
-  if (accessToken) mergedHeaders.set("Authorization", `Bearer ${accessToken}`);
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: mergedHeaders,
+    credentials: "include",
   });
 
-  if (res.status === 401 && retry401 && tokens?.refreshToken) {
+  if (res.status === 401 && retry401) {
     try {
-      const refreshed = await refreshAccessToken(tokens.refreshToken);
-
-      // Support common response shapes:
-      // { accessToken, refreshToken } OR { data: { accessToken, refreshToken } }
-      const next =
-        (isObject(refreshed) && isObject(refreshed.data) ? refreshed.data : refreshed) ??
-        {};
-
-      const newTokens = {
-        accessToken: next.accessToken ?? accessToken ?? "",
-        refreshToken: next.refreshToken ?? tokens.refreshToken ?? "",
-      };
-      setTokens(newTokens);
-
+      await refreshAccessToken();
       const retryHeaders = new Headers(headers ?? {});
-      if (newTokens.accessToken) {
-        retryHeaders.set("Authorization", `Bearer ${newTokens.accessToken}`);
-      }
-
       const retryRes = await fetch(`${API_BASE_URL}${path}`, {
         ...init,
         headers: retryHeaders,
+        credentials: "include",
       });
       const retryData = await parseJsonSafe(retryRes);
       if (!retryRes.ok) {
@@ -104,7 +65,7 @@ export async function apiFetch(path, { headers, retry401 = true, ...init } = {})
       }
       return retryData;
     } catch {
-      clearTokens();
+      // If refresh fails, treat as logged out.
     }
   }
 
@@ -113,9 +74,5 @@ export async function apiFetch(path, { headers, retry401 = true, ...init } = {})
     throw new ApiError("Request failed", { status: res.status, data });
   }
   return data;
-}
-
-export function persistTokens({ accessToken, refreshToken }) {
-  setTokens({ accessToken, refreshToken });
 }
 

@@ -1,4 +1,4 @@
-import { apiFetch, persistTokens } from "./http.js";
+import { apiFetch } from "./http.js";
 
 //sometimes backend returns extra data=>we aonly keep tokens
 function pick(obj, keys) {
@@ -39,12 +39,9 @@ export async function login({ email, password }) {
     retry401: false,
   });
 
-  const tokens = extractTokens(payload);
-  if (tokens.accessToken && tokens.refreshToken) persistTokens(tokens);
-
   return {
     user: extractUser(payload),
-    tokens,
+    tokens: extractTokens(payload),
     raw: payload,
   };
 }
@@ -69,12 +66,9 @@ export async function registerMultipart({
     retry401: false,
   });
 
-  const tokens = extractTokens(payload);
-  if (tokens.accessToken && tokens.refreshToken) persistTokens(tokens);
-
   return {
     user: extractUser(payload),
-    tokens,
+    tokens: extractTokens(payload),
     raw: payload,
   };
 }

@@ -17,6 +17,8 @@ import PatientDashboardLayout from "./components/patient/layout/PatientDashboard
 import PatientOverview from "./pages/patient/PatientOverview.jsx";
 import PatientPlaceholder from "./pages/patient/PatientPlaceholder.jsx";
 import PatientMessages from "./pages/patient/PatientMessages.jsx";
+import PatientBrowseDoctors from "./pages/patient/PatientBrowseDoctors.jsx";
+import PatientDoctorDetail from "./pages/patient/PatientDoctorDetail.jsx";
 
 function App() {
   return (
@@ -58,7 +60,8 @@ function App() {
             path="appointments"
             element={<PatientPlaceholder title="Appointments" />}
           />
-          <Route path="doctors" element={<PatientPlaceholder title="Doctors" />} />
+          <Route path="doctors" element={<PatientBrowseDoctors />} />
+          <Route path="doctors/:doctorId" element={<PatientDoctorDetail />} />
           <Route
             path="messages"
             element={<PatientMessages />}

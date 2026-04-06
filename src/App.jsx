@@ -16,6 +16,7 @@ import RequirePatient from "./components/auth/RequirePatient.jsx";
 import PatientDashboardLayout from "./components/patient/layout/PatientDashboardLayout.jsx";
 import PatientOverview from "./pages/patient/PatientOverview.jsx";
 import PatientPlaceholder from "./pages/patient/PatientPlaceholder.jsx";
+import PatientMessages from "./pages/patient/PatientMessages.jsx";
 
 function App() {
   return (
@@ -60,7 +61,7 @@ function App() {
           <Route path="doctors" element={<PatientPlaceholder title="Doctors" />} />
           <Route
             path="messages"
-            element={<PatientPlaceholder title="Messages" />}
+            element={<PatientMessages />}
           />
           <Route path="reviews" element={<PatientPlaceholder title="Reviews" />} />
           <Route

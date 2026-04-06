@@ -57,13 +57,11 @@ function RequirePatient() {
       </div>
     );
   }
-
   if (state.status === "blocked") {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
   return <Outlet />;
 }
-
 export default RequirePatient;
 

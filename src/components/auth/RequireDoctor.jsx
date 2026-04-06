@@ -22,7 +22,6 @@ function RequireDoctor() {
 
       try {
         const me = await doctorApi.getMe();
-        // Backend may return { data: ... } or direct object
         const profile = me?.data ?? me;
         dispatch(setCredentials({ user: profile, role: "doctor" }));
         if (mounted) setState({ status: "ok", error: null });

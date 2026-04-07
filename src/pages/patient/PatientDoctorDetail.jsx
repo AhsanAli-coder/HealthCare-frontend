@@ -1,12 +1,60 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import * as patientApi from "../../api/patientApi.js";
+import { useAppSelector } from "../../store/hooks.js";
+
+function toYmd(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function formatSlot(isoLocal) {
+  try {
+    const dt = new Date(isoLocal);
+    return dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return isoLocal;
+  }
+}
+
+function formatHHmm(isoLocal) {
+  try {
+    const dt = new Date(isoLocal);
+    return dt.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  } catch {
+    return "";
+  }
+}
 
 export default function PatientDoctorDetail() {
   const { doctorId } = useParams();
+  const { user: authUser } = useAppSelector((s) => s.auth);
   const [doctor, setDoctor] = useState(null);
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState(null);
+
+  const [slotDate, setSlotDate] = useState(() => toYmd(new Date()));
+  const [slotMinutes, setSlotMinutes] = useState(30);
+  const [bufferMinutes, setBufferMinutes] = useState(0);
+  const [slotsStatus, setSlotsStatus] = useState("idle");
+  const [slotsError, setSlotsError] = useState(null);
+  const [slots, setSlots] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [bookingStatus, setBookingStatus] = useState("idle");
+  const [bookingError, setBookingError] = useState(null);
+  const [bookingSuccess, setBookingSuccess] = useState(null);
+
+  const timezone = useMemo(() => {
+    return (
+      authUser?.timezone ||
+      Intl.DateTimeFormat().resolvedOptions().timeZone ||
+      "UTC"
+    );
+  }, [authUser?.timezone]);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +79,66 @@ export default function PatientDoctorDetail() {
       cancelled = true;
     };
   }, [doctorId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function runSlots() {
+      if (!doctorId || !slotDate) return;
+      setSlotsStatus("loading");
+      setSlotsError(null);
+      setSelectedSlot(null);
+      setBookingStatus("idle");
+      setBookingError(null);
+      setBookingSuccess(null);
+      try {
+        const res = await patientApi.getDoctorAvailableSlots(doctorId, {
+          date: slotDate,
+          tz: timezone,
+          slotMinutes,
+          bufferMinutes,
+        });
+        const list = Array.isArray(res?.data?.slots) ? res.data.slots : [];
+        if (!cancelled) {
+          setSlots(list);
+          setSlotsStatus("ok");
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setSlots([]);
+          setSlotsError(e?.message ?? "Could not load slots");
+          setSlotsStatus("error");
+        }
+      }
+    }
+    runSlots();
+    return () => {
+      cancelled = true;
+    };
+  }, [doctorId, slotDate, timezone, slotMinutes, bufferMinutes]);
+
+  async function onBookSelected() {
+    if (!selectedSlot) return;
+    setBookingStatus("loading");
+    setBookingError(null);
+    setBookingSuccess(null);
+    try {
+      const startTime = formatHHmm(selectedSlot.startAtLocal);
+      const endTime = formatHHmm(selectedSlot.endAtLocal);
+      const res = await patientApi.bookAppointment({
+        doctorId,
+        date: slotDate,
+        startTime,
+        endTime,
+        startAt: selectedSlot.startAtUtc,
+        endAt: selectedSlot.endAtUtc,
+      });
+      setBookingStatus("ok");
+      setBookingSuccess(res?.message ?? "Appointment requested successfully");
+    } catch (e) {
+      setBookingStatus("error");
+      setBookingError(e?.data?.message ?? e?.message ?? "Booking failed");
+    }
+  }
 
   const user = doctor?.userId;
   const name =
@@ -150,6 +258,150 @@ export default function PatientDoctorDetail() {
             </ul>
           </div>
         ) : null}
+
+        {/* Step 2A (FR-004): show available slots */}
+        <div className="border-t border-slate-100 px-6 py-5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                Available slots
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-slate-600">
+                Pick a date to view open slots in your timezone{" "}
+                <span className="font-extrabold text-slate-700">{timezone}</span>.
+              </p>
+            </div>
+            <label className="block">
+              <span className="sr-only">Date</span>
+              <input
+                type="date"
+                value={slotDate}
+                onChange={(e) => setSlotDate(e.target.value)}
+                className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-800 focus:border-[#007E85] focus:outline-none focus:ring-2 focus:ring-[#007E85]/20"
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block">
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                Slot length
+              </span>
+              <select
+                value={slotMinutes}
+                onChange={(e) => setSlotMinutes(Number(e.target.value))}
+                className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-800 focus:border-[#007E85] focus:outline-none focus:ring-2 focus:ring-[#007E85]/20"
+              >
+                {[15, 30, 45, 60].map((m) => (
+                  <option key={m} value={m}>
+                    {m} minutes
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                Buffer
+              </span>
+              <select
+                value={bufferMinutes}
+                onChange={(e) => setBufferMinutes(Number(e.target.value))}
+                className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-800 focus:border-[#007E85] focus:outline-none focus:ring-2 focus:ring-[#007E85]/20"
+              >
+                {[0, 5, 10, 15].map((m) => (
+                  <option key={m} value={m}>
+                    {m} minutes
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {slotsStatus === "loading" ? (
+            <div className="mt-4 text-sm font-semibold text-slate-600">
+              Loading slots…
+            </div>
+          ) : null}
+
+          {slotsStatus === "error" ? (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+              {slotsError}
+            </div>
+          ) : null}
+
+          {slotsStatus === "ok" && slots.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm font-semibold text-slate-600">
+              No available slots for this date.
+            </div>
+          ) : null}
+
+          {slotsStatus === "ok" && slots.length ? (
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {slots.slice(0, 18).map((s) => (
+                <button
+                  key={s.startAtUtc}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSlot(s);
+                    setBookingStatus("idle");
+                    setBookingError(null);
+                    setBookingSuccess(null);
+                  }}
+                  className={[
+                    "rounded-xl border px-3 py-3 text-left text-sm font-extrabold transition",
+                    selectedSlot?.startAtUtc === s.startAtUtc
+                      ? "border-[#007E85] bg-white text-slate-900 ring-2 ring-[#007E85]/15"
+                      : "border-slate-200 bg-slate-50 text-slate-800 hover:border-[#007E85]/40 hover:bg-white",
+                  ].join(" ")}
+                >
+                  {formatSlot(s.startAtLocal)} – {formatSlot(s.endAtLocal)}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {selectedSlot ? (
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-extrabold text-slate-900">
+                    Selected: {formatSlot(selectedSlot.startAtLocal)} –{" "}
+                    {formatSlot(selectedSlot.endAtLocal)}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    This will create a <span className="font-extrabold">pending</span>{" "}
+                    request for the doctor to confirm.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onBookSelected}
+                  disabled={bookingStatus === "loading"}
+                  className="h-11 rounded-xl bg-[#007E85] px-5 text-sm font-extrabold text-white shadow-sm hover:bg-[#006970] disabled:opacity-60"
+                >
+                  {bookingStatus === "loading" ? "Booking…" : "Book appointment"}
+                </button>
+              </div>
+
+              {bookingStatus === "error" && bookingError ? (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+                  {bookingError}
+                </div>
+              ) : null}
+
+              {bookingStatus === "ok" && bookingSuccess ? (
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+                  {bookingSuccess}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-4 text-xs font-semibold text-slate-500">
+              Step 2B: select a slot, then click <span className="font-extrabold">Book appointment</span>.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

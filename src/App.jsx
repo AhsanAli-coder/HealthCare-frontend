@@ -9,9 +9,11 @@ import Signup from "./pages/Signup.jsx";
 import DoctorDashboardLayout from "./components/doctor/layout/DoctorDashboardLayout.jsx";
 import DoctorOverview from "./pages/doctor/DoctorOverview.jsx";
 import DoctorPlaceholder from "./pages/doctor/DoctorPlaceholder.jsx";
+import DoctorAppointments from "./pages/doctor/DoctorAppointments.jsx";
 import DoctorSettings from "./pages/doctor/DoctorSettings.jsx";
 import RequireDoctor from "./components/auth/RequireDoctor.jsx";
 import DoctorMessages from "./pages/doctor/DoctorMessages.jsx";
+import DoctorScheduleTimings from "./pages/doctor/DoctorScheduleTimings.jsx";
 import RequirePatient from "./components/auth/RequirePatient.jsx";
 import PatientDashboardLayout from "./components/patient/layout/PatientDashboardLayout.jsx";
 import PatientOverview from "./pages/patient/PatientOverview.jsx";
@@ -19,6 +21,8 @@ import PatientPlaceholder from "./pages/patient/PatientPlaceholder.jsx";
 import PatientMessages from "./pages/patient/PatientMessages.jsx";
 import PatientBrowseDoctors from "./pages/patient/PatientBrowseDoctors.jsx";
 import PatientDoctorDetail from "./pages/patient/PatientDoctorDetail.jsx";
+import PatientAppointments from "./pages/patient/PatientAppointments.jsx";
+import PatientSettings from "./pages/patient/PatientSettings.jsx";
 
 function App() {
   return (
@@ -29,7 +33,7 @@ function App() {
           <Route path="overview" element={<DoctorOverview />} />
           <Route
             path="appointments"
-            element={<DoctorPlaceholder title="Appointments" />}
+            element={<DoctorAppointments />}
           />
           <Route
             path="patients"
@@ -37,7 +41,7 @@ function App() {
           />
           <Route
             path="schedule"
-            element={<DoctorPlaceholder title="Schedule Timings" />}
+            element={<DoctorScheduleTimings />}
           />
           <Route
             path="payments"
@@ -58,7 +62,7 @@ function App() {
           <Route path="overview" element={<PatientOverview />} />
           <Route
             path="appointments"
-            element={<PatientPlaceholder title="Appointments" />}
+            element={<PatientAppointments />}
           />
           <Route path="doctors" element={<PatientBrowseDoctors />} />
           <Route path="doctors/:doctorId" element={<PatientDoctorDetail />} />
@@ -69,7 +73,7 @@ function App() {
           <Route path="reviews" element={<PatientPlaceholder title="Reviews" />} />
           <Route
             path="settings"
-            element={<PatientPlaceholder title="Settings" />}
+            element={<PatientSettings />}
           />
         </Route>
       </Route>

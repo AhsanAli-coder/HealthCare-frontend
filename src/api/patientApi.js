@@ -28,3 +28,41 @@ export async function getDoctorDetails(doctorId) {
   return await apiFetch(`/patients/doctor/${doctorId}`, { method: "GET" });
 }
 
+export async function getDoctorAvailableSlots(
+  doctorId,
+  { date, tz, slotMinutes, bufferMinutes } = {},
+) {
+  const qs = new URLSearchParams();
+  if (date) qs.set("date", date);
+  if (tz) qs.set("tz", tz);
+  if (slotMinutes != null) qs.set("slotMinutes", String(slotMinutes));
+  if (bufferMinutes != null) qs.set("bufferMinutes", String(bufferMinutes));
+  const q = qs.toString();
+  return await apiFetch(
+    `/appointments/doctor/${doctorId}/slots${q ? `?${q}` : ""}`,
+    { method: "GET" },
+  );
+}
+
+export async function bookAppointment({
+  doctorId,
+  date,
+  startTime,
+  endTime,
+  startAt,
+  endAt,
+}) {
+  return await apiFetch("/appointments/book", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      doctorId,
+      date,
+      startTime,
+      endTime,
+      startAt,
+      endAt,
+    }),
+  });
+}
+

@@ -23,7 +23,16 @@ function RequireDoctor() {
       try {
         const me = await doctorApi.getMe();
         const profile = me?.data ?? me;
-        dispatch(setCredentials({ user: profile, role: "doctor" }));
+        const u = profile?.userId;
+        const mergedUser =
+          u && typeof u === "object" && u._id
+            ? {
+                ...u,
+                role: "doctor",
+                doctorProfileId: profile._id,
+              }
+            : profile;
+        dispatch(setCredentials({ user: mergedUser, role: "doctor" }));
         if (mounted) setState({ status: "ok", error: null });
       } catch (e) {
         if (mounted) setState({ status: "blocked", error: e });

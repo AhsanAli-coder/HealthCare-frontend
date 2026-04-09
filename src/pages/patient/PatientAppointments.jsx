@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import * as appointmentApi from "../../api/appointmentApi.js";
+import { useAppSelector } from "../../store/hooks.js";
+import { formatAppointmentWhen } from "../../utils/appointmentTime.js";
 
 function Badge({ status }) {
   const s = String(status || "pending").toLowerCase();
@@ -27,18 +29,9 @@ function Badge({ status }) {
   );
 }
 
-function whenText(a) {
+function whenText(a, viewerTz) {
   if (a?.startAt) {
-    const d = new Date(a.startAt);
-    if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleString([], {
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
+    return formatAppointmentWhen(a.startAt, viewerTz);
   }
   if (a?.date && a?.startTime) return `${a.date} ${a.startTime}`;
   return "—";
@@ -55,6 +48,10 @@ function doctorNameFromAppointment(a) {
 }
 
 export default function PatientAppointments() {
+  const { user } = useAppSelector((s) => s.auth);
+  const viewerTz =
+    user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState(null);
@@ -120,7 +117,11 @@ export default function PatientAppointments() {
             My appointments
           </h1>
           <p className="mt-1 text-sm font-semibold text-slate-600">
-            View upcoming and past appointments.
+            Times shown in your timezone:{" "}
+            <span className="font-mono font-extrabold text-slate-800">
+              {viewerTz ?? "browser default"}
+            </span>
+            .
           </p>
         </div>
         <button
@@ -200,7 +201,7 @@ export default function PatientAppointments() {
                       {doctorNameFromAppointment(a)}
                     </td>
                     <td className="px-6 py-4 font-semibold text-slate-700">
-                      {whenText(a)}
+                      {whenText(a, viewerTz)}
                     </td>
                     <td className="px-6 py-4">
                       <Badge status={a.status} />

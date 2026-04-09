@@ -8,23 +8,32 @@ function toYmd(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function formatSlot(isoLocal) {
+function formatTimeFromUtc(utcIso, tz, { hour12 = true } = {}) {
   try {
-    const dt = new Date(isoLocal);
-    return dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const dt = new Date(utcIso);
+    if (Number.isNaN(dt.getTime())) return "—";
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12,
+      timeZone: tz,
+    }).format(dt);
   } catch {
-    return isoLocal;
+    return "—";
   }
 }
 
-function formatHHmm(isoLocal) {
+function formatHHmmFromUtc(utcIso, tz) {
   try {
-    const dt = new Date(isoLocal);
-    return dt.toLocaleTimeString([], {
+    const dt = new Date(utcIso);
+    if (Number.isNaN(dt.getTime())) return "";
+    // Use en-GB to guarantee 24h with leading zeros.
+    return new Intl.DateTimeFormat("en-GB", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-    });
+      timeZone: tz,
+    }).format(dt);
   } catch {
     return "";
   }
@@ -122,8 +131,8 @@ export default function PatientDoctorDetail() {
     setBookingError(null);
     setBookingSuccess(null);
     try {
-      const startTime = formatHHmm(selectedSlot.startAtLocal);
-      const endTime = formatHHmm(selectedSlot.endAtLocal);
+      const startTime = formatHHmmFromUtc(selectedSlot.startAtUtc, timezone);
+      const endTime = formatHHmmFromUtc(selectedSlot.endAtUtc, timezone);
       const res = await patientApi.bookAppointment({
         doctorId,
         date: slotDate,
@@ -136,7 +145,20 @@ export default function PatientDoctorDetail() {
       setBookingSuccess(res?.message ?? "Appointment requested successfully");
     } catch (e) {
       setBookingStatus("error");
-      setBookingError(e?.data?.message ?? e?.message ?? "Booking failed");
+      const msg = e?.data?.message ?? e?.message ?? "Booking failed";
+      // If backend still has a hard unique index on (doctorId,date,startTime),
+      // Mongo may throw E11000 even when a previous request was rejected.
+      if (
+        String(msg).includes("E11000") ||
+        String(msg).toLowerCase().includes("duplicate key") ||
+        e?.status === 409
+      ) {
+        setBookingError(
+          "This slot is blocked by a database unique constraint. If the previous appointment was rejected/cancelled, you can only rebook after the backend updates the index to allow rebooking.",
+        );
+      } else {
+        setBookingError(msg);
+      }
     }
   }
 
@@ -267,8 +289,12 @@ export default function PatientDoctorDetail() {
                 Available slots
               </h2>
               <p className="mt-1 text-sm font-semibold text-slate-600">
-                Pick a date to view open slots in your timezone{" "}
-                <span className="font-extrabold text-slate-700">{timezone}</span>.
+                Slots use <span className="font-extrabold text-slate-800">your</span>{" "}
+                saved timezone (
+                <span className="font-mono font-extrabold text-slate-800">
+                  {timezone}
+                </span>
+                ), not the doctor’s. Set it under Patient → Settings if needed.
               </p>
             </div>
             <label className="block">
@@ -355,7 +381,8 @@ export default function PatientDoctorDetail() {
                       : "border-slate-200 bg-slate-50 text-slate-800 hover:border-[#007E85]/40 hover:bg-white",
                   ].join(" ")}
                 >
-                  {formatSlot(s.startAtLocal)} – {formatSlot(s.endAtLocal)}
+                  {formatTimeFromUtc(s.startAtUtc, timezone)} –{" "}
+                  {formatTimeFromUtc(s.endAtUtc, timezone)}
                 </button>
               ))}
             </div>
@@ -366,8 +393,8 @@ export default function PatientDoctorDetail() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-extrabold text-slate-900">
-                    Selected: {formatSlot(selectedSlot.startAtLocal)} –{" "}
-                    {formatSlot(selectedSlot.endAtLocal)}
+                    Selected: {formatTimeFromUtc(selectedSlot.startAtUtc, timezone)} –{" "}
+                    {formatTimeFromUtc(selectedSlot.endAtUtc, timezone)}
                   </p>
                   <p className="mt-1 text-xs font-semibold text-slate-500">
                     This will create a <span className="font-extrabold">pending</span>{" "}

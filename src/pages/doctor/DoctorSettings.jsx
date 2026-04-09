@@ -1,10 +1,17 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DoctorTopbar from "../../components/doctor/layout/DoctorTopbar.jsx";
+import TimezoneSettingsPanel from "../../components/settings/TimezoneSettingsPanel.jsx";
 import { useAppDispatch } from "../../store/hooks.js";
 import { logoutThunk } from "../../store/slices/authSlice.js";
 
-const TABS = ["My Profile", "Change Password", "Notification", "Reviews"];
+const TABS = [
+  "My Profile",
+  "Timezone",
+  "Change Password",
+  "Notification",
+  "Reviews",
+];
 
 const REVIEWS = [
   {
@@ -84,7 +91,7 @@ function ReviewCard({ item }) {
 function DoctorSettings() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("Reviews");
+  const [activeTab, setActiveTab] = useState("Timezone");
 
   const tabUnderline = useMemo(() => {
     const idx = TABS.indexOf(activeTab);
@@ -163,7 +170,7 @@ function DoctorSettings() {
             {/* Right tabbed content */}
             <section className="rounded-2xl bg-white px-6 py-6 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70 lg:col-span-8">
               <div className="relative border-b border-slate-200">
-                <div className="grid grid-cols-4 text-sm font-bold">
+                <div className="grid grid-cols-2 gap-2 text-sm font-bold sm:grid-cols-3 lg:grid-cols-5">
                   {TABS.map((t) => (
                     <button
                       key={t}
@@ -185,7 +192,11 @@ function DoctorSettings() {
                 />
               </div>
 
-              {activeTab === "Reviews" ? (
+              {activeTab === "Timezone" ? (
+                <div className="mt-6">
+                  <TimezoneSettingsPanel title="Your timezone" />
+                </div>
+              ) : activeTab === "Reviews" ? (
                 <div className="mt-6 space-y-4">
                   <h2 className="text-sm font-extrabold text-slate-900">
                     Reviews

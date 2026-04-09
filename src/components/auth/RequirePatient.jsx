@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks.js";
 import { setCredentials } from "../../store/slices/authSlice.js";
-import * as patientApi from "../../api/patientApi.js";
+import * as userApi from "../../api/userApi.js";
 
 function RequirePatient() {
   const location = useLocation();
@@ -21,18 +21,20 @@ function RequirePatient() {
         return;
       }
 
-      // No /patients/me endpoint in your list, so we verify session by hitting
-      // a patient-only endpoint. If it succeeds, user is authenticated as patient.
       try {
-        const data = await patientApi.getMyAppointments();
+        const me = await userApi.getMe();
+        const currentUser = me?.data ?? me;
+        if (!currentUser || currentUser.role !== "patient") {
+          throw new Error("Not a patient");
+        }
         dispatch(
           setCredentials({
-            user: user ?? { role: "patient" },
+            user: currentUser,
             role: "patient",
           }),
         );
         if (mounted) setState({ status: "ok", error: null });
-        return data;
+        return;
       } catch (e) {
         if (mounted) setState({ status: "blocked", error: e });
       }

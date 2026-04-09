@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import * as patientApi from "../../api/patientApi.js";
+import { useAppSelector } from "../../store/hooks.js";
+import { formatAppointmentWhen } from "../../utils/appointmentTime.js";
+
+function doctorNameFromAppointment(a) {
+  const d = a?.doctorId ?? a?.doctor;
+  if (typeof d === "object") {
+    if (typeof d?.userId === "object" && d.userId?.name) return d.userId.name;
+    if (d?.name) return d.name;
+  }
+  return a?.doctorName ?? "—";
+}
 
 function StatCard({ label, value, hint }) {
   return (
@@ -16,6 +27,10 @@ function StatCard({ label, value, hint }) {
 }
 
 export default function PatientOverview() {
+  const { user } = useAppSelector((s) => s.auth);
+  const viewerTz =
+    user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
   const [status, setStatus] = useState("idle");
   const [appointments, setAppointments] = useState([]);
 
@@ -45,9 +60,9 @@ export default function PatientOverview() {
   const stats = useMemo(() => {
     const total = appointments.length;
     const upcoming = appointments.filter((a) => {
-      const raw = a?.date ?? a?.appointmentDate ?? a?.createdAt ?? null;
+      const raw = a?.startAt ?? a?.date ?? a?.appointmentDate ?? a?.createdAt;
       const d = raw ? new Date(raw) : null;
-      return d && d.getTime() >= Date.now();
+      return d && !Number.isNaN(d.getTime()) && d.getTime() >= Date.now();
     }).length;
     return { total, upcoming };
   }, [appointments]);
@@ -90,10 +105,12 @@ export default function PatientOverview() {
               {appointments.slice(0, 6).map((a, idx) => (
                 <tr key={a?._id ?? a?.id ?? idx} className="text-sm">
                   <td className="px-6 py-3 font-semibold text-slate-800">
-                    {a?.doctor?.name ?? a?.doctorName ?? "—"}
+                    {doctorNameFromAppointment(a)}
                   </td>
                   <td className="px-6 py-3 font-semibold text-slate-700">
-                    {a?.date ?? a?.appointmentDate ?? "—"}
+                    {a?.startAt
+                      ? formatAppointmentWhen(a.startAt, viewerTz)
+                      : (a?.date ?? a?.appointmentDate ?? "—")}
                   </td>
                   <td className="px-6 py-3">
                     <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-extrabold text-slate-700">

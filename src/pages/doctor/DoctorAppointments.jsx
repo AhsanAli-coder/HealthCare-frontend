@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import DoctorTopbar from "../../components/doctor/layout/DoctorTopbar.jsx";
 import * as appointmentApi from "../../api/appointmentApi.js";
 import { useAppSelector } from "../../store/hooks.js";
@@ -211,7 +212,23 @@ export default function DoctorAppointments() {
                           <Badge status={a.status} />
                         </td>
                         <td className="px-3 py-3">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {(() => {
+                              const pid =
+                                typeof patient === "object" && patient
+                                  ? patient._id ?? patient.id
+                                  : typeof patient === "string"
+                                    ? patient
+                                    : "";
+                              return pid ? (
+                                <Link
+                                  to={`/doctor/patients?patientId=${encodeURIComponent(pid)}`}
+                                  className="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50"
+                                >
+                                  Patient files
+                                </Link>
+                              ) : null;
+                            })()}
                             {st === "pending" ? (
                               <>
                                 <button
@@ -232,14 +249,22 @@ export default function DoctorAppointments() {
                                 </button>
                               </>
                             ) : st === "confirmed" ? (
-                              <button
-                                type="button"
-                                disabled={isBusy}
-                                onClick={() => act(id, "completed")}
-                                className="h-9 rounded-xl bg-[#007E85] px-3 text-xs font-extrabold text-white hover:bg-[#006970] disabled:opacity-60"
-                              >
-                                Complete
-                              </button>
+                              <>
+                                <Link
+                                  to={`/doctor/prescriptions?appointmentId=${encodeURIComponent(id)}`}
+                                  className="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50"
+                                >
+                                  Prescription
+                                </Link>
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => act(id, "completed")}
+                                  className="h-9 rounded-xl bg-[#007E85] px-3 text-xs font-extrabold text-white hover:bg-[#006970] disabled:opacity-60"
+                                >
+                                  Complete
+                                </button>
+                              </>
                             ) : (
                               <span className="text-xs font-semibold text-slate-400">
                                 —

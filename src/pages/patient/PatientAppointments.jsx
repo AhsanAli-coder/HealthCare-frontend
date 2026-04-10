@@ -197,6 +197,7 @@ export default function PatientAppointments() {
                 const canCancel = st === "pending" || st === "confirmed";
                 const busy = actionId === id;
                 const canReview = st === "completed";
+                const canViewPrescription = st === "completed";
                 return (
                   <tr key={id} className="text-sm">
                     <td className="px-6 py-4 font-extrabold text-slate-900">
@@ -210,6 +211,17 @@ export default function PatientAppointments() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
+                        {canViewPrescription ? (
+                          <Link
+                            to={`/patient/prescriptions/${encodeURIComponent(
+                              id,
+                            )}`}
+                            className="inline-flex h-9 items-center rounded-xl bg-[#007E85] px-3 text-xs font-extrabold text-white hover:bg-[#006970]"
+                          >
+                            Prescription
+                          </Link>
+                        ) : null}
+
                         {canReview ? (
                           <Link
                             to={`/patient/reviews?appointmentId=${encodeURIComponent(

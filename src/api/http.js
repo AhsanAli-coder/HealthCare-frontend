@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "../config/env.js";
+import { extractMessageFromResponseBody } from "./apiResponse.js";
 
 export class ApiError extends Error {
   constructor(message, { status, data } = {}) {
@@ -64,10 +65,13 @@ export async function apiFetch(path, { headers, retry401 = true, ...init } = {})
       });
       const retryData = await parseJsonSafe(retryRes);
       if (!retryRes.ok) {
-        throw new ApiError("Request failed", {
-          status: retryRes.status,
-          data: retryData,
-        });
+        throw new ApiError(
+          extractMessageFromResponseBody(retryData) || "Request failed",
+          {
+            status: retryRes.status,
+            data: retryData,
+          },
+        );
       }
       return retryData;
     } catch {
@@ -77,7 +81,10 @@ export async function apiFetch(path, { headers, retry401 = true, ...init } = {})
 
   const data = await parseJsonSafe(res);
   if (!res.ok) {
-    throw new ApiError("Request failed", { status: res.status, data });
+    throw new ApiError(extractMessageFromResponseBody(data) || "Request failed", {
+      status: res.status,
+      data,
+    });
   }
   return data;
 }

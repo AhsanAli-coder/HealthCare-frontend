@@ -10,6 +10,8 @@ import DoctorDashboardLayout from "./components/doctor/layout/DoctorDashboardLay
 import DoctorOverview from "./pages/doctor/DoctorOverview.jsx";
 import DoctorPlaceholder from "./pages/doctor/DoctorPlaceholder.jsx";
 import DoctorAppointments from "./pages/doctor/DoctorAppointments.jsx";
+import DoctorPrescriptions from "./pages/doctor/DoctorPrescriptions.jsx";
+import DoctorPatientDocuments from "./pages/doctor/DoctorPatientDocuments.jsx";
 import DoctorSettings from "./pages/doctor/DoctorSettings.jsx";
 import RequireDoctor from "./components/auth/RequireDoctor.jsx";
 import DoctorMessages from "./pages/doctor/DoctorMessages.jsx";
@@ -24,6 +26,8 @@ import PatientDoctorDetail from "./pages/patient/PatientDoctorDetail.jsx";
 import PatientAppointments from "./pages/patient/PatientAppointments.jsx";
 import PatientSettings from "./pages/patient/PatientSettings.jsx";
 import PatientReviews from "./pages/patient/PatientReviews.jsx";
+import PatientDocuments from "./pages/patient/PatientDocuments.jsx";
+import PatientPrescription from "./pages/patient/PatientPrescription.jsx";
 
 function App() {
   return (
@@ -37,8 +41,12 @@ function App() {
             element={<DoctorAppointments />}
           />
           <Route
+            path="prescriptions"
+            element={<DoctorPrescriptions />}
+          />
+          <Route
             path="patients"
-            element={<DoctorPlaceholder title="My Patients" />}
+            element={<DoctorPatientDocuments />}
           />
           <Route
             path="schedule"
@@ -71,7 +79,12 @@ function App() {
             path="messages"
             element={<PatientMessages />}
           />
+          <Route path="documents" element={<PatientDocuments />} />
           <Route path="reviews" element={<PatientReviews />} />
+          <Route
+            path="prescriptions/:appointmentId"
+            element={<PatientPrescription />}
+          />
           <Route
             path="settings"
             element={<PatientSettings />}

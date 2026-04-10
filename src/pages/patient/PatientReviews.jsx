@@ -88,8 +88,15 @@ export default function PatientReviews() {
       setRating(5);
     } catch (err) {
       setSubmitStatus("error");
+      const msg =
+        err?.data?.message ||
+        (typeof err?.data === "string" ? err.data : null) ||
+        (err?.message && err.message !== "Request failed" ? err.message : null) ||
+        "Request failed";
       setSubmitMsg(
-        err?.data?.message ?? err?.message ?? "Could not submit review",
+        String(msg).toLowerCase().includes("already reviewed")
+          ? "You can’t review the same appointment twice."
+          : String(msg),
       );
     }
   }

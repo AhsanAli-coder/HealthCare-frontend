@@ -4,6 +4,7 @@ import DoctorTopbar from "../../components/doctor/layout/DoctorTopbar.jsx";
 import * as appointmentApi from "../../api/appointmentApi.js";
 import { useAppSelector } from "../../store/hooks.js";
 import { formatAppointmentWhen } from "../../utils/appointmentTime.js";
+import { chatEligibleAppointment } from "../../utils/appointmentChat.js";
 
 function Badge({ status }) {
   const s = String(status || "pending").toLowerCase();
@@ -185,6 +186,7 @@ export default function DoctorAppointments() {
                     const id = a?._id ?? a?.id;
                     const st = String(a?.status || "").toLowerCase();
                     const isBusy = actionId === id;
+                    const canChat = chatEligibleAppointment(a);
                     return (
                       <tr key={id} className="text-sm">
                         <td className="px-3 py-3">
@@ -265,11 +267,22 @@ export default function DoctorAppointments() {
                                   Complete
                                 </button>
                               </>
-                            ) : (
+                            ) : null}
+                            {canChat ? (
+                              <Link
+                                to={`/doctor/messages?appointmentId=${encodeURIComponent(id)}`}
+                                className="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-extrabold text-[#007E85] hover:bg-slate-50"
+                              >
+                                Chat
+                              </Link>
+                            ) : null}
+                            {st !== "pending" &&
+                            st !== "confirmed" &&
+                            !canChat ? (
                               <span className="text-xs font-semibold text-slate-400">
                                 —
                               </span>
-                            )}
+                            ) : null}
                           </div>
                         </td>
                       </tr>

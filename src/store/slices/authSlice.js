@@ -1,17 +1,45 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import * as authApi from "../../api/authApi.js";
+import { AUTH_ACCESS_TOKEN_KEY } from "../../constants/authStorage.js";
+
+function loadAccessTokenFromStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    return sessionStorage.getItem(AUTH_ACCESS_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function emptyAuthState() {
+  return {
+    user: null,
+    role: null,
+    status: "idle",
+    error: null,
+    isAuthenticated: false,
+    accessToken: null,
+  };
+}
 
 const initialState = {
-  user: null,
-  role: null,
-  status: "idle",
-  error: null,
-  isAuthenticated: false,
+  ...emptyAuthState(),
+  accessToken: loadAccessTokenFromStorage(),
 };
 
 function safeRole(user) {
   if (!user || typeof user !== "object") return null;
   return user.role ?? user.userRole ?? user.type ?? null;
+}
+
+function persistAccessToken(token) {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) sessionStorage.setItem(AUTH_ACCESS_TOKEN_KEY, token);
+    else sessionStorage.removeItem(AUTH_ACCESS_TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 export const loginThunk = createAsyncThunk(
@@ -58,7 +86,15 @@ const authSlice = createSlice({
       state.role = role ?? safeRole(user) ?? null;
       state.isAuthenticated = Boolean(user);
     },
-    logout: () => initialState,
+    setAccessToken: (state, action) => {
+      const t = action.payload ?? null;
+      state.accessToken = t;
+      persistAccessToken(t);
+    },
+    logout: () => {
+      persistAccessToken(null);
+      return emptyAuthState();
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -67,11 +103,16 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(loginThunk.fulfilled, (state, action) => {
-        const { user } = action.payload ?? {};
+        const { user, tokens } = action.payload ?? {};
         state.status = "succeeded";
         state.user = user ?? null;
         state.role = safeRole(user) ?? state.role;
         state.isAuthenticated = true;
+        const at = tokens?.accessToken;
+        if (at) {
+          state.accessToken = at;
+          persistAccessToken(at);
+        }
       })
       .addCase(loginThunk.rejected, (state, action) => {
         state.status = "failed";
@@ -83,11 +124,16 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(registerThunk.fulfilled, (state, action) => {
-        const { user } = action.payload ?? {};
+        const { user, tokens } = action.payload ?? {};
         state.status = "succeeded";
         state.user = user ?? null;
         state.role = safeRole(user) ?? state.role;
         state.isAuthenticated = true;
+        const at = tokens?.accessToken;
+        if (at) {
+          state.accessToken = at;
+          persistAccessToken(at);
+        }
       })
       .addCase(registerThunk.rejected, (state, action) => {
         state.status = "failed";
@@ -95,10 +141,16 @@ const authSlice = createSlice({
           action.payload ?? action.error?.message ?? "Registration failed";
         state.isAuthenticated = false;
       })
-      .addCase(logoutThunk.fulfilled, () => initialState)
-      .addCase(logoutThunk.rejected, () => initialState);
+      .addCase(logoutThunk.fulfilled, () => {
+        persistAccessToken(null);
+        return emptyAuthState();
+      })
+      .addCase(logoutThunk.rejected, () => {
+        persistAccessToken(null);
+        return emptyAuthState();
+      });
   },
 });
 
-export const { setCredentials, logout } = authSlice.actions;
+export const { setCredentials, setAccessToken, logout } = authSlice.actions;
 export default authSlice.reducer;

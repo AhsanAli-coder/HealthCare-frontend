@@ -15,6 +15,13 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Socket.IO (same origin as Vite in dev → ws upgrade to Express)
+      "/socket.io": {
+        target: "http://localhost:9000",
+        changeOrigin: true,
+        ws: true,
+        secure: false,
+      },
     },
   },
 })

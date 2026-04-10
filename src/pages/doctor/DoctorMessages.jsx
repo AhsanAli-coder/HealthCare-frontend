@@ -1,457 +1,184 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import * as appointmentApi from "../../api/appointmentApi.js";
+import * as authApi from "../../api/authApi.js";
+import AppointmentChatRoom from "../../components/chat/AppointmentChatRoom.jsx";
 import DoctorTopbar from "../../components/doctor/layout/DoctorTopbar.jsx";
+import { useAppDispatch, useAppSelector } from "../../store/hooks.js";
+import { setAccessToken } from "../../store/slices/authSlice.js";
+import { formatAppointmentWhen } from "../../utils/appointmentTime.js";
+import { chatEligibleAppointment } from "../../utils/appointmentChat.js";
 
-const CHATS = [
-  {
-    id: "jone-martin",
-    name: "Jone Martin",
-    preview: "Hi Doctor,",
-    time: "25:09",
-    status: "Ongoing Call",
-    online: true,
-  },
-  {
-    id: "jhon-smith",
-    name: "Jhon Smith",
-    preview: "I hope you get well soon",
-    time: "17:10",
-    status: "",
-    online: false,
-  },
-  {
-    id: "jhonathon-smith",
-    name: "Jhonathon Smith",
-    preview: "I have prescribed for you...",
-    time: "Yesterday",
-    status: "",
-    online: false,
-  },
-  {
-    id: "cecilia",
-    name: "Cecillia R. Jones",
-    preview: "Thank you for your advice.",
-    time: "05/04/21",
-    status: "",
-    online: false,
-  },
-  {
-    id: "mr-jhon-doe",
-    name: "Mr. Jhon Doe",
-    preview: "You need to do a lab check",
-    time: "04/04/21",
-    status: "",
-    online: false,
-  },
-  {
-    id: "linda",
-    name: "Linda G. Guthrie",
-    preview: "Okay, see you again Human",
-    time: "03/04/21",
-    status: "",
-    online: false,
-  },
-];
-
-function Avatar({ size = 40, online = false }) {
-  return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <div className="h-full w-full rounded-full bg-slate-200" />
-      {online ? (
-        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
-      ) : null}
-    </div>
-  );
+function patientPeerName(a) {
+  const p = a?.patientId;
+  if (typeof p === "object" && p?.name) return p.name;
+  return "Patient";
 }
 
-function ChatListItem({ chat, active, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "w-full rounded-xl px-3 py-3 text-left transition-colors",
-        active ? "bg-sky-50" : "hover:bg-slate-50",
-      ].join(" ")}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Avatar size={40} online={chat.online} />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-extrabold text-slate-900">
-              {chat.name}
-            </p>
-            <p className="truncate text-xs text-slate-500">{chat.preview}</p>
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-xs font-semibold text-slate-400">{chat.time}</p>
-          {chat.status ? (
-            <p className="mt-1 text-[11px] font-bold text-[#007E85]">
-              {chat.status}
-            </p>
-          ) : null}
-        </div>
-      </div>
-    </button>
-  );
-}
+export default function DoctorMessages() {
+  const dispatch = useAppDispatch();
+  const { user, accessToken } = useAppSelector((s) => s.auth);
+  const viewerTz =
+    user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
-function Bubble({ side, children, meta }) {
-  const isRight = side === "right";
-  return (
-    <div className={isRight ? "flex justify-end" : "flex justify-start"}>
-      <div className={isRight ? "flex items-end gap-3" : "flex items-end gap-3"}>
-        {!isRight ? <Avatar size={32} online /> : null}
-        <div
-          className={[
-            "max-w-[520px] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
-            isRight
-              ? "bg-[#2D9CFF] text-white"
-              : "bg-white text-slate-700 ring-1 ring-slate-200/70",
-          ].join(" ")}
-        >
-          {children}
-        </div>
-        {isRight ? <Avatar size={32} /> : null}
-      </div>
-      {meta ? (
-        <p
-          className={[
-            "mt-1 text-[11px] text-slate-400",
-            isRight ? "text-right" : "text-left",
-          ].join(" ")}
-        >
-          {meta}
-        </p>
-      ) : null}
-    </div>
-  );
-}
+  const [searchParams] = useSearchParams();
+  const queryApptId = searchParams.get("appointmentId") || "";
 
-function DoctorMessages() {
-  const [activeId, setActiveId] = useState(CHATS[0].id);
-  const [search, setSearch] = useState("");
-  const [text, setText] = useState("");
+  const [items, setItems] = useState([]);
+  const [listStatus, setListStatus] = useState("loading");
+  const [listError, setListError] = useState(null);
+  const [selectedId, setSelectedId] = useState(queryApptId);
+  const [tokenStatus, setTokenStatus] = useState("idle");
 
-  const activeChat = useMemo(
-    () => CHATS.find((c) => c.id === activeId) ?? CHATS[0],
-    [activeId],
+  useEffect(() => {
+    if (queryApptId) setSelectedId(queryApptId);
+  }, [queryApptId]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      setListStatus("loading");
+      setListError(null);
+      try {
+        const res = await appointmentApi.getDoctorAppointments();
+        const list = Array.isArray(res?.data) ? res.data : [];
+        if (mounted) setItems(list);
+        if (mounted) setListStatus("ok");
+      } catch (e) {
+        if (mounted) {
+          setListError(e?.data?.message ?? e?.message ?? "Could not load");
+          setListStatus("error");
+        }
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (accessToken) {
+      setTokenStatus("ok");
+      return;
+    }
+    let cancelled = false;
+    setTokenStatus("loading");
+    (async () => {
+      try {
+        const t = await authApi.refreshAccessToken();
+        if (!cancelled && t) dispatch(setAccessToken(t));
+        if (!cancelled) setTokenStatus(t ? "ok" : "error");
+      } catch {
+        if (!cancelled) setTokenStatus("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, dispatch]);
+
+  const chatAppointments = useMemo(
+    () => items.filter((a) => chatEligibleAppointment(a)),
+    [items],
   );
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return CHATS;
-    return CHATS.filter((c) => c.name.toLowerCase().includes(q));
-  }, [search]);
+  const selected = useMemo(
+    () => chatAppointments.find((a) => String(a._id ?? a.id) === selectedId),
+    [chatAppointments, selectedId],
+  );
 
-  function onSend(e) {
-    e.preventDefault();
-    setText("");
-  }
+  useEffect(() => {
+    if (selectedId || chatAppointments.length === 0) return;
+    const first = chatAppointments[0];
+    const fid = String(first._id ?? first.id);
+    if (fid) setSelectedId(fid);
+  }, [selectedId, chatAppointments]);
 
   return (
     <>
-      <DoctorTopbar title="Stephen Conley" subtitle="Cardiologist" />
+      <DoctorTopbar title="Messages" subtitle="Chat with patients (confirmed visits)" />
 
-      <div className="px-6 py-6">
-        <div className="grid h-[calc(100vh-5rem-3rem)] max-h-[780px] gap-6 lg:grid-cols-[320px_1fr]">
-          {/* Left: chat list */}
-          <section className="rounded-2xl bg-white shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <h1 className="text-base font-extrabold text-slate-900">
-                Message
-              </h1>
-              <div className="mt-3">
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"
-                      />
-                    </svg>
-                  </span>
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search for message"
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#007E85] focus:outline-none focus:ring-2 focus:ring-[#007E85]/20"
-                  />
-                </div>
-              </div>
-              <div className="mt-4 flex items-center justify-between text-xs font-bold text-slate-500">
-                <span>Recent Chat</span>
-                <span>▾</span>
-              </div>
+      <div className="space-y-4 px-6 py-6">
+        {tokenStatus === "error" && !accessToken ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+            Could not refresh an access token for live chat. Try logging out and
+            signing in again.
+          </div>
+        ) : null}
+
+        <div className="grid h-[calc(100vh-8rem)] min-h-[420px] max-h-[820px] gap-4 lg:grid-cols-[minmax(260px,320px)_1fr]">
+          <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
+            <div className="border-b border-slate-200 px-4 py-3">
+              <h2 className="text-sm font-extrabold text-slate-900">
+                Active chats
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                Within 1 hour after appointment start.
+              </p>
             </div>
-
-            <div className="max-h-[620px] overflow-auto px-3 py-3">
-              <div className="space-y-1">
-                {filtered.map((chat) => (
-                  <ChatListItem
-                    key={chat.id}
-                    chat={chat}
-                    active={chat.id === activeId}
-                    onClick={() => setActiveId(chat.id)}
-                  />
-                ))}
-              </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+              {listStatus === "loading" ? (
+                <p className="px-2 py-4 text-sm text-slate-600">Loading…</p>
+              ) : null}
+              {listError ? (
+                <p className="px-2 py-2 text-sm font-semibold text-red-700">
+                  {listError}
+                </p>
+              ) : null}
+              {listStatus === "ok" && chatAppointments.length === 0 ? (
+                <p className="px-2 py-4 text-sm font-semibold text-slate-600">
+                  No active chat windows. Confirm appointments and chat during the
+                  visit hour.
+                </p>
+              ) : null}
+              {chatAppointments.map((a) => {
+                const id = String(a._id ?? a.id);
+                const active = id === selectedId;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setSelectedId(id)}
+                    className={[
+                      "mb-1 w-full rounded-xl px-3 py-3 text-left transition-colors",
+                      active ? "bg-sky-50" : "hover:bg-slate-50",
+                    ].join(" ")}
+                  >
+                    <p className="truncate text-sm font-extrabold text-slate-900">
+                      {patientPeerName(a)}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      {a?.startAt
+                        ? formatAppointmentWhen(a.startAt, viewerTz)
+                        : "—"}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           </section>
 
-          {/* Right: conversation */}
-          <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70">
-            {/* conversation header */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <div className="flex items-center gap-3">
-                <Avatar size={40} online />
-                <div>
-                  <p className="text-sm font-extrabold text-slate-900">
-                    {activeChat.name}
-                  </p>
-                  <p className="text-xs font-semibold text-[#007E85]">Online</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-slate-400">
-                <button
-                  type="button"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100"
-                  aria-label="Favorite"
-                >
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-                    />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100"
-                  aria-label="Info"
-                >
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 16v-4m0-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* messages */}
-            <div className="flex-1 overflow-auto bg-white px-6 py-6">
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Avatar size={32} online />
-                  <div>
-                    <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200/70">
-                      Hi Doctor,
-                    </div>
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Today 7:45 am
-                    </p>
-                  </div>
-                </div>
-
-                <Bubble side="right" meta="Today 7:55 am">
-                  Good Morning
-                </Bubble>
-                <Bubble side="right" meta="Today 7:55 am">
-                  Whats the matter jone?
-                </Bubble>
-
-                <div className="flex items-start gap-3">
-                  <Avatar size={32} online />
-                  <div>
-                    <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-700 ring-1 ring-slate-200/70">
-                      I am not fine. I am a cardio patient. I need your help
-                      immediately.
-                    </div>
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Today 7:59 am
-                    </p>
-                  </div>
-                </div>
-
-                <Bubble side="right" meta="Today 7:55 am">
-                  Hey man, don’t worry I am here. Let me know your situation
-                  now.
-                </Bubble>
-
-                <div className="flex items-start gap-3">
-                  <Avatar size={32} online />
-                  <div className="space-y-2">
-                    <div className="inline-flex gap-2">
-                      <div className="h-16 w-16 rounded-xl bg-slate-200" />
-                      <div className="h-16 w-16 rounded-xl bg-slate-200" />
-                    </div>
-                    <div className="rounded-2xl bg-white px-4 py-2 text-sm text-slate-700 ring-1 ring-slate-200/70">
-                      Sure
-                    </div>
-                  </div>
-                </div>
-
-                {/* audio bubble */}
-                <div className="flex justify-end">
-                  <div className="flex w-[320px] items-center gap-3 rounded-2xl bg-[#2D9CFF] px-4 py-3 text-white shadow-sm">
-                    <button
-                      type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/20"
-                      aria-label="Play"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </button>
-                    <div className="h-2 flex-1 rounded-full bg-white/30">
-                      <div className="h-2 w-[55%] rounded-full bg-white" />
-                    </div>
-                    <span className="text-xs font-semibold">1:30</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* composer */}
-            <form
-              onSubmit={onSend}
-              className="border-t border-slate-200 px-6 py-4"
-            >
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  aria-label="Emoji"
-                >
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M9 10h.01M15 10h.01M8 15s1.5 2 4 2 4-2 4-2"
-                    />
-                  </svg>
-                </button>
-
-                <div className="relative flex-1">
-                  <input
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder="Type a message..."
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#007E85] focus:outline-none focus:ring-2 focus:ring-[#007E85]/20"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  aria-label="Attach"
-                >
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21.44 11.05 12.25 20.24a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"
-                    />
-                  </svg>
-                </button>
-
-                <button
-                  type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  aria-label="Voice"
-                >
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 1a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19 10v1a7 7 0 0 1-14 0v-1"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 19v4"
-                    />
-                  </svg>
-                </button>
-
-                <button
-                  type="submit"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#6D63FF] text-white shadow-sm hover:opacity-95"
-                  aria-label="Send"
-                >
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    aria-hidden
-                  >
-                    <path d="M2 21 23 12 2 3v7l15 2-15 2v7z" />
-                  </svg>
-                </button>
-              </div>
-            </form>
+          <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
+            <AppointmentChatRoom
+              appointmentId={selectedId}
+              appointmentMeta={selected}
+              accessToken={accessToken}
+              currentUserId={user?._id ?? user?.id}
+              peerLabel={selected ? patientPeerName(selected) : "Patient"}
+            />
           </section>
+        </div>
+
+        <div className="flex justify-end">
+          <Link
+            to="/doctor/appointments"
+            className="text-sm font-extrabold text-[#007E85] hover:underline"
+          >
+            Back to appointments
+          </Link>
         </div>
       </div>
     </>
   );
 }
-
-export default DoctorMessages;
-

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import * as appointmentApi from "../../api/appointmentApi.js";
 import { useAppSelector } from "../../store/hooks.js";
 import { formatAppointmentWhen } from "../../utils/appointmentTime.js";
+import { chatEligibleAppointment } from "../../utils/appointmentChat.js";
 
 function Badge({ status }) {
   const s = String(status || "pending").toLowerCase();
@@ -198,6 +199,7 @@ export default function PatientAppointments() {
                 const busy = actionId === id;
                 const canReview = st === "completed";
                 const canViewPrescription = st === "completed";
+                const canChat = chatEligibleAppointment(a);
                 return (
                   <tr key={id} className="text-sm">
                     <td className="px-6 py-4 font-extrabold text-slate-900">
@@ -233,6 +235,17 @@ export default function PatientAppointments() {
                           </Link>
                         ) : null}
 
+                        {canChat ? (
+                          <Link
+                            to={`/patient/messages?appointmentId=${encodeURIComponent(
+                              id,
+                            )}`}
+                            className="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-extrabold text-[#007E85] hover:bg-slate-50"
+                          >
+                            Chat
+                          </Link>
+                        ) : null}
+
                         {canCancel ? (
                           <button
                             type="button"
@@ -244,7 +257,10 @@ export default function PatientAppointments() {
                           </button>
                         ) : null}
 
-                        {!canReview && !canCancel ? (
+                        {!canReview &&
+                        !canCancel &&
+                        !canViewPrescription &&
+                        !canChat ? (
                           <span className="text-xs font-semibold text-slate-400">
                             —
                           </span>

@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "../config/env.js";
+import { AUTH_ACCESS_TOKEN_KEY } from "../constants/authStorage.js";
 import { apiFetch } from "./http.js";
 
 //sometimes backend returns extra data=>we aonly keep tokens
@@ -79,4 +81,35 @@ export async function logout() {
     method: "POST",
   });
   return payload;
+}
+
+/**
+ * Uses refresh httpOnly cookie; returns accessToken from JSON body for Socket.IO auth.
+ * Does not use apiFetch (avoid 401 retry loops).
+ */
+export async function refreshAccessToken() {
+  const res = await fetch(`${API_BASE_URL}/users/refresh-token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      data?.message ??
+      data?.data?.message ??
+      (typeof data === "string" ? data : null) ??
+      "Refresh failed";
+    throw new Error(msg);
+  }
+  const inner = data?.data ?? data;
+  const accessToken = inner?.accessToken;
+  if (accessToken && typeof window !== "undefined") {
+    try {
+      sessionStorage.setItem(AUTH_ACCESS_TOKEN_KEY, accessToken);
+    } catch {
+      /* ignore */
+    }
+  }
+  return accessToken ?? null;
 }

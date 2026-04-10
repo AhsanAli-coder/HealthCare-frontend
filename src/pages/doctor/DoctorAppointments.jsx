@@ -15,7 +15,11 @@ function Badge({ status }) {
           ? "bg-red-50 text-red-700 ring-red-200"
           : s === "cancelled"
             ? "bg-slate-100 text-slate-700 ring-slate-200"
-            : "bg-slate-100 text-slate-700 ring-slate-200";
+            : s === "completed"
+              ? "bg-blue-50 text-blue-700 ring-blue-200"
+              : s === "no_show"
+                ? "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200"
+                : "bg-slate-100 text-slate-700 ring-slate-200";
   return (
     <span
       className={[
@@ -227,6 +231,15 @@ export default function DoctorAppointments() {
                                   Confirm
                                 </button>
                               </>
+                            ) : st === "confirmed" ? (
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => act(id, "completed")}
+                                className="h-9 rounded-xl bg-[#007E85] px-3 text-xs font-extrabold text-white hover:bg-[#006970] disabled:opacity-60"
+                              >
+                                Complete
+                              </button>
                             ) : (
                               <span className="text-xs font-semibold text-slate-400">
                                 —

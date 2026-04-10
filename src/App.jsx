@@ -23,6 +23,7 @@ import PatientBrowseDoctors from "./pages/patient/PatientBrowseDoctors.jsx";
 import PatientDoctorDetail from "./pages/patient/PatientDoctorDetail.jsx";
 import PatientAppointments from "./pages/patient/PatientAppointments.jsx";
 import PatientSettings from "./pages/patient/PatientSettings.jsx";
+import PatientReviews from "./pages/patient/PatientReviews.jsx";
 
 function App() {
   return (
@@ -70,7 +71,7 @@ function App() {
             path="messages"
             element={<PatientMessages />}
           />
-          <Route path="reviews" element={<PatientPlaceholder title="Reviews" />} />
+          <Route path="reviews" element={<PatientReviews />} />
           <Route
             path="settings"
             element={<PatientSettings />}

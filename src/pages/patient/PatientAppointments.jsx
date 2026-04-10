@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import * as appointmentApi from "../../api/appointmentApi.js";
 import { useAppSelector } from "../../store/hooks.js";
 import { formatAppointmentWhen } from "../../utils/appointmentTime.js";
@@ -195,6 +196,7 @@ export default function PatientAppointments() {
                 const st = String(a?.status || "").toLowerCase();
                 const canCancel = st === "pending" || st === "confirmed";
                 const busy = actionId === id;
+                const canReview = st === "completed";
                 return (
                   <tr key={id} className="text-sm">
                     <td className="px-6 py-4 font-extrabold text-slate-900">
@@ -207,20 +209,35 @@ export default function PatientAppointments() {
                       <Badge status={a.status} />
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {canCancel ? (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => cancel(id)}
-                          className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                        >
-                          Cancel
-                        </button>
-                      ) : (
-                        <span className="text-xs font-semibold text-slate-400">
-                          —
-                        </span>
-                      )}
+                      <div className="flex justify-end gap-2">
+                        {canReview ? (
+                          <Link
+                            to={`/patient/reviews?appointmentId=${encodeURIComponent(
+                              id,
+                            )}`}
+                            className="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50"
+                          >
+                            Review
+                          </Link>
+                        ) : null}
+
+                        {canCancel ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => cancel(id)}
+                            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                          >
+                            Cancel
+                          </button>
+                        ) : null}
+
+                        {!canReview && !canCancel ? (
+                          <span className="text-xs font-semibold text-slate-400">
+                            —
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 );

@@ -1,4 +1,13 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import DoctorTopbar from "../../components/doctor/layout/DoctorTopbar.jsx";
+import * as doctorApi from "../../api/doctorApi.js";
+import { pickEntity } from "../../api/apiResponse.js";
+import { useAppSelector } from "../../store/hooks.js";
+import {
+  getDoctorReviewsList,
+  mapReviewToCardItem,
+} from "../../api/reviewApi.js";
 
 function StatCard({ color, title, value, icon }) {
   return (
@@ -50,6 +59,64 @@ function AppointmentRequestRow({ name, meta, status }) {
   );
 }
 
+function StarRow({ count = 5 }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: count }).map((_, i) => (
+        <svg
+          key={i}
+          className="h-3.5 w-3.5 text-amber-400"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden
+        >
+          <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+function initialsFromName(name) {
+  if (!name || typeof name !== "string") return "?";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const a = parts[0]?.[0] ?? "";
+  const b = parts.length > 1 ? parts[parts.length - 1][0] : parts[0]?.[1] ?? "";
+  return (a + b).toUpperCase() || "?";
+}
+
+function OverviewReviewCard({ item }) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2">
+          {item.profilePhoto ? (
+            <img
+              src={item.profilePhoto}
+              alt=""
+              className="h-9 w-9 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#007E85]/15 text-[10px] font-extrabold text-[#007E85]">
+              {initialsFromName(item.name)}
+            </span>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-extrabold text-slate-900">
+              {item.name}
+            </p>
+            <p className="text-[11px] font-semibold text-slate-500">{item.date}</p>
+          </div>
+        </div>
+        <StarRow count={item.stars} />
+      </div>
+      <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-[#5c6e82]">
+        {item.text}
+      </p>
+    </div>
+  );
+}
+
 function TodayRow({ name, type, time, chip }) {
   return (
     <div className="flex items-center justify-between gap-4 py-3">
@@ -71,16 +138,90 @@ function TodayRow({ name, type, time, chip }) {
 }
 
 function DoctorOverview() {
+  const { user } = useAppSelector((s) => s.auth);
+  const [profileDoc, setProfileDoc] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewsStatus, setReviewsStatus] = useState("idle");
+  const [reviewsError, setReviewsError] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await doctorApi.getMe();
+        const doc = pickEntity(res) ?? res?.data ?? null;
+        if (alive && doc) setProfileDoc(doc);
+      } catch {
+        /* optional: overview still works with auth user only */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const doctorId = user?.doctorProfileId ?? profileDoc?._id ?? null;
+
+  useEffect(() => {
+    if (!doctorId) return;
+    let alive = true;
+    setReviewsStatus("loading");
+    setReviewsError(null);
+    getDoctorReviewsList(doctorId)
+      .then((rows) => {
+        if (!alive) return;
+        setReviews(rows);
+        setReviewsStatus("ok");
+      })
+      .catch((e) => {
+        if (!alive) return;
+        setReviews([]);
+        setReviewsStatus("error");
+        setReviewsError(
+          e?.data?.message ?? e?.message ?? "Could not load reviews",
+        );
+      });
+    return () => {
+      alive = false;
+    };
+  }, [doctorId]);
+
+  const displayName = useMemo(() => {
+    const n = user?.name;
+    if (n) return n.startsWith("Dr.") ? n : `Dr. ${n}`;
+    const u = profileDoc?.userId;
+    if (typeof u === "object" && u?.name) {
+      return u.name.startsWith("Dr.") ? u.name : `Dr. ${u.name}`;
+    }
+    return "Doctor";
+  }, [user?.name, profileDoc]);
+
+  const specialization = profileDoc?.specialization ?? "Your practice";
+
+  const welcomeFirst = useMemo(() => {
+    const plain = displayName.replace(/^Dr\.\s*/i, "").trim();
+    return plain.split(/\s+/)[0] || "Doctor";
+  }, [displayName]);
+
+  const reviewsSummary = useMemo(() => {
+    if (!reviews.length) return { count: 0, avg: null };
+    const sum = reviews.reduce((s, r) => s + (Number(r.rating) || 0), 0);
+    return { count: reviews.length, avg: sum / reviews.length };
+  }, [reviews]);
+
   return (
     <>
-      <DoctorTopbar title="Stephen Conley" subtitle="Cardiologist" />
+      <DoctorTopbar title={displayName} subtitle={specialization} />
 
       <div className="mx-auto max-w-[1200px] px-6 py-8">
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-extrabold text-slate-900">
-            Welcome, Dr. Stephen
+            Welcome, Dr. {welcomeFirst}
           </h1>
-          <p className="text-sm text-slate-500">Have a nice day at great work</p>
+          <p className="text-sm text-slate-500">
+            Have a productive day — here is a snapshot of your dashboard
+            (sample metrics below).
+          </p>
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -132,12 +273,12 @@ function DoctorOverview() {
               <h2 className="text-sm font-extrabold text-slate-900">
                 Appointment Request
               </h2>
-              <button
-                type="button"
+              <Link
+                to="/doctor/appointments"
                 className="text-xs font-bold text-[#007E85] hover:opacity-80"
               >
                 View All →
-              </button>
+              </Link>
             </div>
             <div className="mt-4 divide-y divide-slate-100">
               <AppointmentRequestRow
@@ -238,12 +379,12 @@ function DoctorOverview() {
                     Upcoming Schedules - 2
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="rounded-xl bg-[#6D63FF] px-4 py-2 text-xs font-bold"
+                <Link
+                  to="/doctor/schedule"
+                  className="rounded-xl bg-[#6D63FF] px-4 py-2 text-xs font-bold text-white hover:opacity-95"
                 >
                   Open
-                </button>
+                </Link>
               </div>
             </div>
           </section>
@@ -254,12 +395,12 @@ function DoctorOverview() {
             <h2 className="text-sm font-extrabold text-slate-900">
               Recent Patients
             </h2>
-            <button
-              type="button"
+            <Link
+              to="/doctor/appointments"
               className="text-xs font-bold text-[#007E85] hover:opacity-80"
             >
               View All →
-            </button>
+            </Link>
           </div>
 
           <div className="mt-4 overflow-x-auto">
@@ -291,6 +432,69 @@ function DoctorOverview() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl bg-white px-6 py-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-900">
+                Patient reviews
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                Latest feedback from your patients (
+                <span className="font-mono">GET /reviews/doctor/:id</span>).
+              </p>
+            </div>
+            {reviewsStatus === "ok" && reviews.length > 0 ? (
+              <span className="text-sm font-bold text-slate-700">
+                {reviewsSummary.count} rating
+                {reviewsSummary.count === 1 ? "" : "s"}
+                {reviewsSummary.avg != null ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <span className="text-[#007E85]">
+                      {reviewsSummary.avg.toFixed(1)}
+                    </span>{" "}
+                    avg
+                  </>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
+
+          {reviewsStatus === "loading" ? (
+            <p className="mt-5 text-sm font-semibold text-slate-600">
+              Loading reviews…
+            </p>
+          ) : reviewsStatus === "error" ? (
+            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+              {reviewsError}
+            </div>
+          ) : reviews.length === 0 ? (
+            <p className="mt-5 rounded-xl border border-slate-100 bg-slate-50 px-4 py-8 text-center text-sm font-semibold text-slate-600">
+              No reviews yet. Completed-appointment feedback from patients will
+              appear here and in Settings → Reviews.
+            </p>
+          ) : (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {reviews.map((r) => (
+                <OverviewReviewCard
+                  key={String(r._id)}
+                  item={mapReviewToCardItem(r)}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 text-center">
+            <Link
+              to="/doctor/settings"
+              className="text-xs font-extrabold text-[#007E85] hover:underline"
+            >
+              All reviews in Settings →
+            </Link>
           </div>
         </section>
       </div>

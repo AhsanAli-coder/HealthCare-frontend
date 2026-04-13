@@ -26,6 +26,10 @@ function Login() {
     e.preventDefault();
     const res = await dispatch(loginThunk({ email, password }));
     const role = res?.payload?.user?.role ?? res?.payload?.user?.userRole;
+    if (role === "admin") {
+      navigate("/admin/overview", { replace: true });
+      return;
+    }
     if (role === "doctor") {
       navigate("/doctor/overview", { replace: true });
       return;

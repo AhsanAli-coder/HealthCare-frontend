@@ -1,15 +1,9 @@
 import { NavLink } from "react-router-dom";
 
 const ITEMS = [
-  { to: "/doctor/overview", label: "Overview" },
-  { to: "/doctor/appointments", label: "Appointment" },
-  { to: "/doctor/prescriptions", label: "Prescriptions" },
-  { to: "/doctor/patients", label: "My Patients" },
-  { to: "/doctor/schedule", label: "Schedule Timings" },
-  { to: "/doctor/payments", label: "Payments" },
-  { to: "/doctor/messages", label: "Message" },
-  { to: "/doctor/notifications", label: "Notifications" },
-  { to: "/doctor/settings", label: "Settings" },
+  { to: "/admin/overview", label: "Dashboard" },
+  { to: "/admin/pending-doctors", label: "Pending doctors" },
+  { to: "/admin/users", label: "Users" },
 ];
 
 function linkClass({ isActive }) {
@@ -20,13 +14,13 @@ function linkClass({ isActive }) {
     : `${base} text-slate-600 hover:bg-slate-100 hover:text-slate-900`;
 }
 
-function DoctorSidebar() {
+export default function AdminSidebar() {
   return (
     <aside className="sticky top-0 hidden h-screen w-[260px] shrink-0 border-r border-slate-200 bg-white lg:block">
       <div className="flex h-20 items-center px-6">
-        <span className="text-lg font-extrabold text-slate-900">Doct.</span>
+        <span className="text-lg font-extrabold text-slate-900">Admin</span>
       </div>
-      <nav className="px-3 pb-6" aria-label="Doctor dashboard">
+      <nav className="px-3 pb-6" aria-label="Admin">
         <div className="space-y-1">
           {ITEMS.map((item) => (
             <NavLink key={item.to} to={item.to} className={linkClass}>
@@ -39,6 +33,3 @@ function DoctorSidebar() {
     </aside>
   );
 }
-
-export default DoctorSidebar;
-

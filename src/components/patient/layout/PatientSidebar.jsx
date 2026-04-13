@@ -5,6 +5,7 @@ const nav = [
   { to: "/patient/appointments", label: "Appointments" },
   { to: "/patient/doctors", label: "Doctors" },
   { to: "/patient/messages", label: "Messages" },
+  { to: "/patient/notifications", label: "Notifications" },
   { to: "/patient/documents", label: "Documents" },
   { to: "/patient/reviews", label: "Reviews" },
   { to: "/patient/settings", label: "Settings" },

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useAppSelector } from "../../../store/hooks.js";
+import { useDashboardNotifications } from "../../../context/DashboardNotificationContext.jsx";
 
 function IconButton({ children, label }) {
   return (
@@ -12,40 +14,24 @@ function IconButton({ children, label }) {
   );
 }
 
+function initialsFromName(name) {
+  if (!name || typeof name !== "string") return "?";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const a = parts[0]?.[0] ?? "";
+  const b = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (a + b).toUpperCase() || "?";
+}
+
 function DoctorTopbar({ title = "Welcome, Doctor", subtitle = "" }) {
-  const [query, setQuery] = useState("");
+  const { unreadCount } = useDashboardNotifications();
+  const { user } = useAppSelector((s) => s.auth);
+  const photoUrl = user?.profilePhoto?.trim() ? user.profilePhoto : null;
+  const displayTitle = title || user?.name || "Doctor";
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
-      <div className="flex h-20 w-full items-center gap-5 px-6">
-        <div className="hidden flex-1 lg:block">
-          <div className="relative max-w-lg">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"
-                />
-              </svg>
-            </span>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search Appointment, Patient or etc"
-              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#007E85] focus:outline-none focus:ring-2 focus:ring-[#007E85]/20"
-            />
-          </div>
-        </div>
-
-        <div className="ml-auto flex items-center gap-2">
+      <div className="flex h-20 w-full items-center justify-end gap-3 px-6">
+        <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
           <IconButton label="Help">
             <svg
               className="h-5 w-5"
@@ -67,7 +53,11 @@ function DoctorTopbar({ title = "Welcome, Doctor", subtitle = "" }) {
               />
             </svg>
           </IconButton>
-          <IconButton label="Notifications">
+          <Link
+            to="/doctor/notifications"
+            className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
+          >
             <svg
               className="h-5 w-5"
               viewBox="0 0 24 24"
@@ -87,31 +77,40 @@ function DoctorTopbar({ title = "Welcome, Doctor", subtitle = "" }) {
                 d="M9 17a3 3 0 0 0 6 0"
               />
             </svg>
-          </IconButton>
+            {unreadCount > 0 ? (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#007E85] px-0.5 text-[9px] font-extrabold text-white">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            ) : null}
+          </Link>
 
-          <div className="ml-2 flex items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-1.5">
-            <span className="h-8 w-8 rounded-full bg-slate-200" aria-hidden />
-            <div className="hidden sm:block">
-              <p className="text-sm font-bold text-slate-900">{title}</p>
+          <Link
+            to="/doctor/settings"
+            className="ml-1 flex min-w-0 max-w-[min(100%,18rem)] items-center gap-3 rounded-full border border-slate-200 bg-white py-1.5 pl-1.5 pr-3 transition hover:bg-slate-50"
+          >
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt=""
+                className="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-slate-100"
+              />
+            ) : (
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#007E85]/15 text-[11px] font-extrabold text-[#007E85] ring-2 ring-slate-100"
+                aria-hidden
+              >
+                {initialsFromName(user?.name)}
+              </span>
+            )}
+            <div className="min-w-0 hidden text-left sm:block">
+              <p className="truncate text-sm font-bold text-slate-900">
+                {displayTitle}
+              </p>
               {subtitle ? (
-                <p className="text-xs text-slate-500">{subtitle}</p>
+                <p className="truncate text-xs text-slate-500">{subtitle}</p>
               ) : null}
             </div>
-            <svg
-              className="h-4 w-4 text-slate-500"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m6 9 6 6 6-6"
-              />
-            </svg>
-          </div>
+          </Link>
         </div>
       </div>
     </header>
@@ -119,4 +118,3 @@ function DoctorTopbar({ title = "Welcome, Doctor", subtitle = "" }) {
 }
 
 export default DoctorTopbar;
-

@@ -12,3 +12,12 @@ export async function updateAvailability(availability) {
   });
 }
 
+/** PATCH /doctors/update-profile — specialization, experience, consultationFee, bio (send only fields to change). */
+export async function updateDoctorProfile(body) {
+  return await apiFetch("/doctors/update-profile", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+

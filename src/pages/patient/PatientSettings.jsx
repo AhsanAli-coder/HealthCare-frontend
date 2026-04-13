@@ -1,3 +1,5 @@
+import ChangePasswordPanel from "../../components/settings/ChangePasswordPanel.jsx";
+import ProfilePhotoSettingsPanel from "../../components/settings/ProfilePhotoSettingsPanel.jsx";
 import TimezoneSettingsPanel from "../../components/settings/TimezoneSettingsPanel.jsx";
 
 export default function PatientSettings() {
@@ -9,6 +11,8 @@ export default function PatientSettings() {
           Account preferences for your patient dashboard.
         </p>
       </div>
+      <ProfilePhotoSettingsPanel layout="panel" />
+      <ChangePasswordPanel />
       <TimezoneSettingsPanel title="Your timezone" />
     </div>
   );

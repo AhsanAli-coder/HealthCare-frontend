@@ -21,6 +21,14 @@ function titleForPath(pathname) {
   return "Dashboard";
 }
 
+function initialsFromName(name) {
+  if (!name || typeof name !== "string") return "?";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const a = parts[0]?.[0] ?? "";
+  const b = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (a + b).toUpperCase() || "?";
+}
+
 export default function PatientTopbar() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,6 +37,7 @@ export default function PatientTopbar() {
   const { unreadCount } = useDashboardNotifications();
 
   const title = titleForPath(location.pathname);
+  const photoUrl = user?.profilePhoto?.trim() ? user.profilePhoto : null;
 
   return (
     <header className="sticky top-0 z-20 w-full border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -77,7 +86,23 @@ export default function PatientTopbar() {
           >
             Logout
           </button>
-          <div className="h-10 w-10 rounded-2xl bg-slate-100" />
+          <Link
+            to="/patient/settings"
+            className="ml-1 inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200 hover:opacity-95"
+            aria-label="Open settings"
+          >
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="text-xs font-extrabold text-slate-600" aria-hidden>
+                {initialsFromName(user?.name)}
+              </span>
+            )}
+          </Link>
         </div>
       </div>
     </header>

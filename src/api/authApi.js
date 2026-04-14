@@ -2,7 +2,6 @@ import { API_BASE_URL } from "../config/env.js";
 import { AUTH_ACCESS_TOKEN_KEY } from "../constants/authStorage.js";
 import { apiFetch } from "./http.js";
 
-//sometimes backend returns extra data=>we aonly keep tokens
 function pick(obj, keys) {
   if (!obj || typeof obj !== "object") return {};
   const out = {};
@@ -10,11 +9,7 @@ function pick(obj, keys) {
   return out;
 }
 
-//✔ If data exists → return data.data
-//✔ Else → return original object
-
 function unwrap(data) {
-  // Accept: { data: ... } or direct payload
   if (data && typeof data === "object" && "data" in data) return data.data;
   return data;
 }
@@ -23,7 +18,6 @@ function extractTokens(payload) {
   const p = unwrap(payload) ?? {};
   const { accessToken, refreshToken } = p;
   if (accessToken || refreshToken) return { accessToken, refreshToken };
-  // Accept nested token objects too
   if (p.tokens) return pick(p.tokens, ["accessToken", "refreshToken"]);
   return { accessToken: undefined, refreshToken: undefined };
 }
@@ -76,7 +70,6 @@ export async function registerMultipart({
 }
 
 export async function logout() {
-  // backend expects auth header, apiFetch will attach
   const payload = await apiFetch("/users/logout", {
     method: "POST",
   });

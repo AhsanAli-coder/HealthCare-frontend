@@ -24,7 +24,6 @@ async function refreshAccessToken() {
   const res = await fetch(`${API_BASE_URL}/users/refresh-token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    // Backend uses httpOnly cookies; send them along.
     credentials: "include",
   });
   const data = await parseJsonSafe(res);
@@ -40,11 +39,6 @@ async function refreshAccessToken() {
  * - retries once on 401 by calling refresh-token (cookie-based)
  */
 
-
-// Why we do it this way
-// Centralizes API logic → don’t repeat fetch and token logic everywhere.
-// Handles auth refresh automatically → smooth user experience.
-// Provides consistent error handling.
 export async function apiFetch(path, { headers, retry401 = true, ...init } = {}) {
   const mergedHeaders = new Headers(headers ?? {});
 
@@ -75,7 +69,6 @@ export async function apiFetch(path, { headers, retry401 = true, ...init } = {})
       }
       return retryData;
     } catch {
-      // If refresh fails, treat as logged out.
     }
   }
 

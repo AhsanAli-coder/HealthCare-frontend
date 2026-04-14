@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import DoctorTopbar from "../../components/doctor/layout/DoctorTopbar.jsx";
+import * as appointmentApi from "../../api/appointmentApi.js";
 import * as doctorApi from "../../api/doctorApi.js";
 import { pickEntity } from "../../api/apiResponse.js";
 import { useAppSelector } from "../../store/hooks.js";
@@ -8,6 +9,7 @@ import {
   getDoctorReviewsList,
   mapReviewToCardItem,
 } from "../../api/reviewApi.js";
+import { formatAppointmentWhen } from "../../utils/appointmentTime.js";
 
 function StatCard({ color, title, value, icon }) {
   return (
@@ -137,9 +139,32 @@ function TodayRow({ name, type, time, chip }) {
   );
 }
 
+function safeNameFromPopulated(user) {
+  if (user && typeof user === "object" && user?.name) return user.name;
+  return "—";
+}
+
+function safeMetaFromAppointment(a, tz) {
+  if (!a) return "—";
+  const when = a?.startAt ? formatAppointmentWhen(a.startAt, tz) : null;
+  const timePart = when || (a?.date && a?.startTime ? `${a.date} ${a.startTime}` : "—");
+  return timePart;
+}
+
+function dayKeyInTz(date, tz) {
+  try {
+    return new Date(date).toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD
+  } catch {
+    return "";
+  }
+}
+
 function DoctorOverview() {
   const { user } = useAppSelector((s) => s.auth);
   const [profileDoc, setProfileDoc] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentsStatus, setAppointmentsStatus] = useState("idle");
+  const [appointmentsError, setAppointmentsError] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [reviewsStatus, setReviewsStatus] = useState("idle");
   const [reviewsError, setReviewsError] = useState(null);
@@ -155,6 +180,34 @@ function DoctorOverview() {
         /* optional: overview still works with auth user only */
       }
     })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const viewerTz =
+    user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+  useEffect(() => {
+    let alive = true;
+    setAppointmentsStatus("loading");
+    setAppointmentsError(null);
+    appointmentApi
+      .getDoctorAppointments()
+      .then((res) => {
+        const list = Array.isArray(res?.data) ? res.data : [];
+        if (!alive) return;
+        setAppointments(list);
+        setAppointmentsStatus("ok");
+      })
+      .catch((e) => {
+        if (!alive) return;
+        setAppointments([]);
+        setAppointmentsStatus("error");
+        setAppointmentsError(
+          e?.data?.message ?? e?.message ?? "Could not load appointments",
+        );
+      });
     return () => {
       alive = false;
     };
@@ -203,6 +256,74 @@ function DoctorOverview() {
     return plain.split(/\s+/)[0] || "Doctor";
   }, [displayName]);
 
+  const apptStats = useMemo(() => {
+    const total = appointments.length;
+    const pending = appointments.filter(
+      (a) => String(a?.status || "").toLowerCase() === "pending",
+    ).length;
+    const confirmed = appointments.filter(
+      (a) => String(a?.status || "").toLowerCase() === "confirmed",
+    ).length;
+    const uniquePatients = new Set(
+      appointments
+        .map((a) => {
+          const p = a?.patientId;
+          if (p && typeof p === "object") return String(p._id ?? p.id ?? "");
+          return String(p ?? "");
+        })
+        .filter(Boolean),
+    ).size;
+    return { total, pending, confirmed, uniquePatients };
+  }, [appointments]);
+
+  const todayKey = useMemo(
+    () => dayKeyInTz(Date.now(), viewerTz),
+    [viewerTz],
+  );
+
+  const pendingRequests = useMemo(() => {
+    return appointments
+      .filter((a) => String(a?.status || "").toLowerCase() === "pending")
+      .slice(0, 4);
+  }, [appointments]);
+
+  const todayAppointments = useMemo(() => {
+    const list = appointments.filter((a) => {
+      if (!a?.startAt) return false;
+      const k = dayKeyInTz(a.startAt, viewerTz);
+      return k && todayKey && k === todayKey;
+    });
+    const score = (a) => {
+      const s = String(a?.status || "").toLowerCase();
+      if (s === "confirmed") return 0;
+      if (s === "pending") return 1;
+      return 2;
+    };
+    return list.sort((a, b) => score(a) - score(b)).slice(0, 3);
+  }, [appointments, viewerTz, todayKey]);
+
+  const recentPatients = useMemo(() => {
+    const sorted = [...appointments].sort((a, b) => {
+      const ta = new Date(a?.startAt || a?.createdAt || 0).getTime();
+      const tb = new Date(b?.startAt || b?.createdAt || 0).getTime();
+      return tb - ta;
+    });
+    const seen = new Set();
+    const out = [];
+    for (const a of sorted) {
+      const p = a?.patientId;
+      const pid =
+        p && typeof p === "object"
+          ? String(p._id ?? p.id ?? "")
+          : String(p ?? "");
+      if (!pid || seen.has(pid)) continue;
+      seen.add(pid);
+      out.push(a);
+      if (out.length >= 6) break;
+    }
+    return out;
+  }, [appointments]);
+
   const reviewsSummary = useMemo(() => {
     if (!reviews.length) return { count: 0, avg: null };
     const sum = reviews.reduce((s, r) => s + (Number(r.rating) || 0), 0);
@@ -227,8 +348,8 @@ function DoctorOverview() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             color="#6D63FF"
-            value="24.4k"
-            title="Appointments"
+            value={String(apptStats.total)}
+            title="Total appointments"
             icon={
               <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M7 2v2H5a2 2 0 0 0-2 2v2h18V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm14 8H3v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10z" />
@@ -237,8 +358,8 @@ function DoctorOverview() {
           />
           <StatCard
             color="#FF5C7A"
-            value="166.3k"
-            title="Total Patient"
+            value={String(apptStats.uniquePatients)}
+            title="Unique patients"
             icon={
               <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-3.33 0-8 1.67-8 5v1h16v-1c0-3.33-4.67-5-8-5z" />
@@ -247,8 +368,8 @@ function DoctorOverview() {
           />
           <StatCard
             color="#FFA200"
-            value="53.5k"
-            title="Clinic Consulting"
+            value={String(apptStats.pending)}
+            title="Pending requests"
             icon={
               <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M7 7h10v10H7V7zm-2 0a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7z" />
@@ -257,8 +378,8 @@ function DoctorOverview() {
           />
           <StatCard
             color="#2D9CFF"
-            value="28.0k"
-            title="Video Consulting"
+            value={String(apptStats.confirmed)}
+            title="Confirmed"
             icon={
               <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M15 10.5V7a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3.5l6 4v-11l-6 4z" />
@@ -268,7 +389,7 @@ function DoctorOverview() {
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-12">
-          <section className="rounded-2xl bg-white px-6 py-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70 lg:col-span-5">
+          <section className="rounded-2xl bg-white px-6 py-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70 lg:col-span-6">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-extrabold text-slate-900">
                 Appointment Request
@@ -281,93 +402,73 @@ function DoctorOverview() {
               </Link>
             </div>
             <div className="mt-4 divide-y divide-slate-100">
-              <AppointmentRequestRow
-                name="Bogdan Krivenchenko"
-                meta="45 Male, 12 April 9:30"
-                status="Declined"
-              />
-              <AppointmentRequestRow
-                name="Jenny Wilson"
-                meta="Female, 25 April 10:30 AM"
-                status="Confirmed"
-              />
-              <AppointmentRequestRow
-                name="Dianne Russel"
-                meta="Male, 45 Today 14:30 PM"
-                status="Confirmed"
-              />
-              <AppointmentRequestRow
-                name="Annette Black"
-                meta="Male, 45 Today 14:30 PM"
-                status="Declined"
-              />
+              {appointmentsStatus === "loading" ? (
+                <p className="py-3 text-sm font-semibold text-slate-600">
+                  Loading…
+                </p>
+              ) : appointmentsStatus === "error" ? (
+                <p className="py-3 text-sm font-semibold text-red-700">
+                  {appointmentsError}
+                </p>
+              ) : pendingRequests.length === 0 ? (
+                <p className="py-3 text-sm font-semibold text-slate-600">
+                  No pending requests.
+                </p>
+              ) : (
+                pendingRequests.map((a) => (
+                  <AppointmentRequestRow
+                    key={String(a?._id ?? a?.id)}
+                    name={safeNameFromPopulated(a?.patientId)}
+                    meta={safeMetaFromAppointment(a, viewerTz)}
+                    status="Pending"
+                  />
+                ))
+              )}
             </div>
           </section>
 
-          <div className="grid gap-6 lg:col-span-3">
-            <section>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-extrabold text-slate-900">
-                  Patients
-                </h2>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  2020
-                </span>
-              </div>
-              <div className="grid gap-4">
-                <MiniStat value="24.4k" label="New Patient" delta="+15%" />
-                <MiniStat value="166.3k" label="Old Patient" delta="+15%" />
-              </div>
-            </section>
-
-            <section>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-extrabold text-slate-900">
-                  Gender
-                </h2>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  2020
-                </span>
-              </div>
-              <div className="rounded-2xl bg-white px-6 py-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70">
-                <div className="mx-auto h-28 w-28 rounded-full border-8 border-slate-100">
-                  <div className="h-full w-full rounded-full border-8 border-[#6D63FF]/70" />
-                </div>
-                <div className="mt-4 flex justify-around text-xs font-semibold text-slate-600">
-                  <span>Male 45%</span>
-                  <span>Female 30%</span>
-                  <span>Child 25%</span>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <section className="rounded-2xl bg-white px-6 py-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70 lg:col-span-4">
+          <section className="rounded-2xl bg-white px-6 py-5 shadow-sm shadow-slate-900/5 ring-1 ring-slate-200/70 lg:col-span-6">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-extrabold text-slate-900">
                 Today Appointments
               </h2>
-              <span className="text-xs font-semibold text-slate-500">Today</span>
+              <span className="text-xs font-semibold text-slate-500">
+                {todayKey || "Today"}
+              </span>
             </div>
             <div className="mt-4 divide-y divide-slate-100">
-              <TodayRow
-                name="Jhon Smith"
-                type="Clinic Consulting"
-                time="Ongoing"
-                chip="Ongoing"
-              />
-              <TodayRow
-                name="Frank Murray"
-                type="Video Consulting"
-                time="10:25"
-                chip="10:25"
-              />
-              <TodayRow
-                name="Ella Lucia"
-                type="Emergency"
-                time="11:30"
-                chip="11:30"
-              />
+              {appointmentsStatus === "loading" ? (
+                <p className="py-3 text-sm font-semibold text-slate-600">
+                  Loading…
+                </p>
+              ) : appointmentsStatus === "error" ? (
+                <p className="py-3 text-sm font-semibold text-red-700">
+                  {appointmentsError}
+                </p>
+              ) : todayAppointments.length === 0 ? (
+                <p className="py-3 text-sm font-semibold text-slate-600">
+                  No appointments today.
+                </p>
+              ) : (
+                todayAppointments.map((a) => {
+                  const st = String(a?.status || "").toLowerCase();
+                  const chip =
+                    st === "confirmed"
+                      ? "Confirmed"
+                      : st === "pending"
+                        ? "Pending"
+                        : st || "—";
+                  return (
+                    <TodayRow
+                      key={String(a?._id ?? a?.id)}
+                      name={safeNameFromPopulated(a?.patientId)}
+                      type="Consultation"
+                      time={safeMetaFromAppointment(a, viewerTz)}
+                      chip={chip}
+                    />
+                  );
+                })
+              )}
             </div>
             <div className="mt-6 rounded-2xl bg-slate-900 px-5 py-4 text-white">
               <div className="flex items-center justify-between">
@@ -376,7 +477,7 @@ function DoctorOverview() {
                     Next Week
                   </p>
                   <p className="mt-1 text-sm font-bold">
-                    Upcoming Schedules - 2
+                    Upcoming schedules
                   </p>
                 </div>
                 <Link
@@ -416,20 +517,49 @@ function DoctorOverview() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {[
-                  ["Deveon Lane", "OPD-2345", "5/7/21", "Male", "Diabetes", "Out-Patient"],
-                  ["Albert Flores", "IPD-2424", "5/7/21", "Male", "Diabetes", "Out-Patient"],
-                  ["Ella Lucia", "OPD-2345", "8/15/21", "Male", "Diabetes", "Out-Patient"],
-                ].map((row) => (
-                  <tr key={row[1]} className="text-slate-700">
-                    <td className="py-3 pr-6 font-semibold">{row[0]}</td>
-                    <td className="py-3 pr-6">{row[1]}</td>
-                    <td className="py-3 pr-6">{row[2]}</td>
-                    <td className="py-3 pr-6">{row[3]}</td>
-                    <td className="py-3 pr-6">{row[4]}</td>
-                    <td className="py-3 pr-2 text-slate-500">{row[5]}</td>
+                {appointmentsStatus === "loading" ? (
+                  <tr>
+                    <td className="py-4 text-sm font-semibold text-slate-600" colSpan={6}>
+                      Loading…
+                    </td>
                   </tr>
-                ))}
+                ) : appointmentsStatus === "error" ? (
+                  <tr>
+                    <td className="py-4 text-sm font-semibold text-red-700" colSpan={6}>
+                      {appointmentsError}
+                    </td>
+                  </tr>
+                ) : recentPatients.length === 0 ? (
+                  <tr>
+                    <td className="py-4 text-sm font-semibold text-slate-600" colSpan={6}>
+                      No patients yet.
+                    </td>
+                  </tr>
+                ) : (
+                  recentPatients.map((a) => {
+                    const p = a?.patientId;
+                    const pid =
+                      p && typeof p === "object"
+                        ? String(p._id ?? p.id ?? "")
+                        : "";
+                    const when = safeMetaFromAppointment(a, viewerTz);
+                    const status = String(a?.status || "").toLowerCase();
+                    return (
+                      <tr key={String(a?._id ?? a?.id)} className="text-slate-700">
+                        <td className="py-3 pr-6 font-semibold">
+                          {safeNameFromPopulated(p)}
+                        </td>
+                        <td className="py-3 pr-6">
+                          {pid ? pid.slice(-6).toUpperCase() : "—"}
+                        </td>
+                        <td className="py-3 pr-6">{when}</td>
+                        <td className="py-3 pr-6">—</td>
+                        <td className="py-3 pr-6">—</td>
+                        <td className="py-3 pr-2 text-slate-500">{status || "—"}</td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

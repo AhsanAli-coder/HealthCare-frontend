@@ -40,7 +40,6 @@ function whenText(a, viewerTz) {
 }
 
 function doctorNameFromAppointment(a) {
-  // backend: populated doctorId -> userId
   const d = a?.doctorId;
   if (typeof d === "object") {
     if (typeof d?.userId === "object" && d.userId?.name) return d.userId.name;
@@ -87,7 +86,6 @@ export default function PatientAppointments() {
       return items.filter((a) => String(a?.status).toLowerCase() === "cancelled");
     if (tab === "completed")
       return items.filter((a) => String(a?.status).toLowerCase() === "completed");
-    // upcoming: pending/confirmed + future (if startAt available)
     return items.filter((a) => {
       const s = String(a?.status || "").toLowerCase();
       if (!["pending", "confirmed"].includes(s)) return false;
